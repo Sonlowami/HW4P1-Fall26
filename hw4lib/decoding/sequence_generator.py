@@ -323,10 +323,10 @@ class SequenceGenerator:
             if finished.all():
                 break
 
-                flat_x = x.reshape(batch_size * beam_width, x.size(-1))
-                logits = self.score_fn(flat_x).reshape(
-                    batch_size, beam_width, -1
-                )
+            flat_x = x.reshape(batch_size * beam_width, x.size(-1))
+            logits = self.score_fn(flat_x).reshape(
+                batch_size, beam_width, -1
+            )
             logits = self._apply_repeat_penalty(logits, x, repeat_penalty)
             log_probs = torch.log_softmax(logits, dim=-1)
 
