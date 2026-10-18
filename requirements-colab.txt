@@ -1,0 +1,10 @@
+# Keep Colab's preinstalled torch, CUDA, and scientific Python stack.
+# Install without --upgrade; do not use the local requirements.txt on Colab.
+numpy
+matplotlib
+seaborn
+PyYAML
+tqdm
+tokenizers
+torchinfo==1.8.0
+wandb
