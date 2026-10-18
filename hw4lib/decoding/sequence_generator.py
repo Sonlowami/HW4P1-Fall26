@@ -240,10 +240,43 @@ class SequenceGenerator:
         if repeat_penalty <= 0:
             raise ValueError("repeat_penalty must be > 0")
 
-        # TODO: Implement greedy search.
-        # When cache_score_fn is provided, prefill it with the complete prompt,
-        # then pass only the newest generated token on later decoding steps.
-        raise NotImplementedError  # Remove once implemented
+        sequences = x
+        scores = torch.zeros(sequences.size(0), device=sequences.device)
+        finished = torch.zeros(
+            sequences.size(0), dtype=torch.bool, device=sequences.device
+        )
+        cache = None
+        cache_input = sequences
+
+        for _ in range(self.max_length - sequences.size(1)):
+            logits, cache = self._score_next(sequences, cache_input, cache)
+            logits = self._apply_repeat_penalty(
+                logits,
+                sequences,
+                repeat_penalty,
+            )
+            log_probs = torch.log_softmax(logits, dim=-1)
+
+            if finished.any():
+                log_probs = log_probs.masked_fill(
+                    finished.unsqueeze(-1), float("-inf")
+                )
+                log_probs[finished, self.tokenizer.eos_id] = 0.0
+
+            next_tokens = torch.argmax(log_probs, dim=-1)
+            token_scores = log_probs.gather(
+                1, next_tokens.unsqueeze(-1)
+            ).squeeze(-1)
+            scores = torch.where(finished, scores, scores + token_scores)
+
+            sequences = torch.cat([sequences, next_tokens.unsqueeze(1)], dim=1)
+            cache_input = next_tokens.unsqueeze(1)
+            finished = finished | (next_tokens == self.tokenizer.eos_id)
+
+            if finished.all():
+                break
+
+        return sequences, scores
 
     def generate_beam(
             self,
@@ -290,10 +323,10 @@ class SequenceGenerator:
             if finished.all():
                 break
 
-            beam_logits = []
-            for beam_idx in range(beam_width):
-                beam_logits.append(self.score_fn(x[:, beam_idx, :]))
-            logits = torch.stack(beam_logits, dim=1)
+                flat_x = x.reshape(batch_size * beam_width, x.size(-1))
+                logits = self.score_fn(flat_x).reshape(
+                    batch_size, beam_width, -1
+                )
             logits = self._apply_repeat_penalty(logits, x, repeat_penalty)
             log_probs = torch.log_softmax(logits, dim=-1)
 
