@@ -110,15 +110,34 @@ class MultiHeadAttention:
         """
         Merge two mask types into a single mask.
         """
-        # Expand masks for broadcasting
-        key_mask = np.broadcast_to(np.expand_dims(key_padding_mask, 1), (self.N, self.num_heads, self.S))
-        attention_mask = np.broadcast_to(np.expand_dims(attn_mask, 1), (self.L, self.num_heads, self.S))
-        
-        # Combine masks
-        attention_mask = attention_mask.transpose(1, 0, 2)[None, :, :, :]
-        key_mask = key_mask[:, :, None, :]
-        
-        return key_mask + attention_mask
+        # Build a full-size boolean mask because the attention implementation
+        # applies boolean indexing rather than NumPy broadcasting.
+        key_mask = None
+        attention_mask = None
+
+        if key_padding_mask is not None:
+            key_mask = key_padding_mask[:, None, None, :]
+
+        if attn_mask is not None:
+            attention_mask = attn_mask[None, None, :, :]
+
+        if key_mask is None and attention_mask is None:
+            return None
+        if key_mask is None:
+            return np.broadcast_to(
+                attention_mask,
+                (self.N, self.num_heads, self.L, self.S),
+            )
+        if attention_mask is None:
+            return np.broadcast_to(
+                key_mask,
+                (self.N, self.num_heads, self.L, self.S),
+            )
+
+        return np.broadcast_to(
+            np.logical_or(key_mask, attention_mask),
+            (self.N, self.num_heads, self.L, self.S),
+        )
 
     def _split_heads(self, x):
         """

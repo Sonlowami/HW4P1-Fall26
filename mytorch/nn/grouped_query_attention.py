@@ -48,8 +48,8 @@ class GroupedQueryAttention:
         # they carry num_kv_heads heads instead of num_heads.
         # What output size does that give the key and value projections?
         self.q_proj   = Linear(embed_dim, embed_dim)
-        self.k_proj   = Linear(embed_dim, embed_dim // self.num_kv_heads)
-        self.v_proj   = Linear(embed_dim, embed_dim // self.num_kv_heads)
+        self.k_proj   = Linear(embed_dim, self.num_kv_heads * self.head_dim)
+        self.v_proj   = Linear(embed_dim, self.num_kv_heads * self.head_dim)
         self.out_proj = Linear(embed_dim, embed_dim)
 
     def init_weights(
@@ -146,10 +146,8 @@ class GroupedQueryAttention:
         d_q, d_k, d_v = self.attention.backward(d_attn_outputs)
 
         # Reduce the repeated key/value gradients back to compact heads
-        d_k = d_k.reshape(
-            self.N, self.num_kv_heads, self.num_kv_groups, self.S, self.head_dim).sum(axis=2)
-        d_v = d_v.reshape(
-            self.N, self.num_kv_heads, self.num_kv_groups, self.S, self.head_dim).sum(axis=2)
+        d_k = self._sum_kv_gradients(d_k)
+        d_v = self._sum_kv_gradients(d_v)
 
         # Merge head gradients
         d_q = self._concat_heads(d_q)
@@ -243,3 +241,14 @@ class GroupedQueryAttention:
         x = np.repeat(x, self.num_kv_groups, axis=1)
 
         return x
+
+    def _sum_kv_gradients(self, x: np.ndarray) -> np.ndarray:
+        """Sum gradients from repeated query heads into compact KV heads."""
+        N, _, sequence_length, head_dim = x.shape
+        return x.reshape(
+            N,
+            self.num_kv_heads,
+            self.num_kv_groups,
+            sequence_length,
+            head_dim,
+        ).sum(axis=2)

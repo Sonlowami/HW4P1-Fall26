@@ -39,6 +39,17 @@ class ScaledDotProductAttention:
         # # Think about which dimension you should apply Softmax
         self.attention_scores = self.softmax.forward(scaled_dot_product)
 
+        # A row with every key masked has no valid probability distribution.
+        # Keep its attention output and gradients at zero instead of returning
+        # a uniform distribution from softmax over equal masked logits.
+        if mask is not None:
+            fully_masked = np.all(mask == 1, axis=-1, keepdims=True)
+            self.attention_scores = np.where(
+                fully_masked,
+                0.0,
+                self.attention_scores,
+            )
+
         # Calculate final output
         output = self.attention_scores @ V
 
