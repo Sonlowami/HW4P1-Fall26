@@ -57,9 +57,9 @@ class MultiHeadAttention:
         self.E = query.shape[2]
         
         # Project inputs
-        q = self.q_proj(query)
-        k = self.k_proj(key)
-        v = self.v_proj(value)
+        q = self.q_proj.forward(query)
+        k = self.k_proj.forward(key)
+        v = self.v_proj.forward(value)
 
         # Reshape for multiple heads
         q = self._split_heads(q)
