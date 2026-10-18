@@ -76,7 +76,7 @@ class MultiHeadAttention:
         attn_output = self._concat_heads(attn_outputs)
 
         # Final projection
-        output = self.out_proj(attn_output)
+        output = self.out_proj.forward(attn_output)
 
         return output
 
