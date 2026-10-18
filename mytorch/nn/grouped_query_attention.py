@@ -171,6 +171,9 @@ class GroupedQueryAttention:
         """
         Merge two mask types into a single mask.
         """
+        if key_padding_mask is None and attn_mask is None:
+            return None
+
         key_mask = None
         attention_mask = None
 
@@ -181,11 +184,16 @@ class GroupedQueryAttention:
             attention_mask = attn_mask[None, None, :, :]
 
         if key_mask is None:
-            return attention_mask
-        if attention_mask is None:
-            return key_mask
+            combined_mask = attention_mask
+        elif attention_mask is None:
+            combined_mask = key_mask
+        else:
+            combined_mask = np.logical_or(key_mask, attention_mask)
 
-        return np.logical_or(key_mask, attention_mask)
+        return np.broadcast_to(
+            combined_mask,
+            (self.N, self.num_heads, self.L, self.S),
+        )
 
     def _split_heads(
         self,
