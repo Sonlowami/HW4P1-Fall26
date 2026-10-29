@@ -315,6 +315,13 @@ class SequenceGenerator:
 
         # Initialize beams by repeating input; only first beam is active.
         x = x.unsqueeze(1).expand(batch_size, beam_width, seq_len).contiguous()
+        if self.max_length == seq_len:
+            return x, torch.zeros(
+                (batch_size, beam_width),
+                device=x.device,
+                dtype=torch.float32,
+            )
+
         scores = torch.full((batch_size, beam_width), float("-inf"), device=x.device)
         scores[:, 0] = 0.0
         finished = torch.zeros((batch_size, beam_width), dtype=torch.bool, device=x.device)
