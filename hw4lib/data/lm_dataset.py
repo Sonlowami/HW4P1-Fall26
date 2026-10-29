@@ -330,6 +330,25 @@ class LMDataset(Dataset):
         if not shard_path.is_file():
             raise FileNotFoundError(f"Token shard not found: {shard_path}")
 
+        actual_size = shard_path.stat().st_size
+        expected_size = num_tokens * SHARD_DTYPE.itemsize
+        if actual_size != expected_size:
+            raise ValueError(
+                f"Shard size mismatch for {filename}: "
+                f"expected {expected_size} bytes, found {actual_size}"
+            )
+
+        declared_size = shard.get("size_bytes")
+        if declared_size is not None:
+            if (
+                not isinstance(declared_size, int)
+                or isinstance(declared_size, bool)
+                or declared_size != actual_size
+            ):
+                raise ValueError(
+                    f"Shard size_bytes does not match file size for {filename}"
+                )
+
         validated_entry = (shard_path, num_tokens)
         return validated_entry
 

@@ -109,10 +109,12 @@ def write_token_shards(
             if shard_file is None:
                 return
             shard_file.close()
+            shard_path = staging / shard_filename
             shards.append(
                 {
                     "file": shard_filename,
                     "num_tokens": shard_token_count,
+                    "size_bytes": shard_path.stat().st_size,
                 }
             )
             shard_file = None
